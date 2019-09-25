@@ -35,7 +35,6 @@ def create_response(
     }
     return jsonify(response), status
 
-
 """
 ~~~~~~~~~~~~ API ~~~~~~~~~~~~
 """
@@ -53,7 +52,16 @@ def mirror(name):
 
 @app.route("/shows", methods=['GET'])
 def get_all_shows():
-    return create_response({"shows": db.get('shows')})
+    minEpisodes = request.args.get("minEpisodes", None)
+    try:
+        minEpisodes = int(minEpisodes)
+    except ValueError:
+        return create_response(status=422, message="Invalid argument for minEpisodes. Expected type int")
+    if minEpisodes is None or not isinstance(minEpisodes, int):
+        return create_response({"shows": db.get('shows')})
+    return create_response({"shows": 
+                           [show for show in db.get('shows') 
+			    if show["episodes_seen"] >= int(minEpisodes)]})
 
 @app.route("/shows/<id>", methods=['DELETE'])
 def delete_show(id):
@@ -63,7 +71,38 @@ def delete_show(id):
     return create_response(message="Show deleted")
 
 
-# TODO: Implement the rest of the API here!
+@app.route("/shows/<id>", methods=['GET'])
+def get_show(id):
+    if db.getById('shows', int(id)) is None:
+        return create_response(status=404, message="No show with this id exists")
+    return create_response(db.getById('shows', int(id)))
+
+@app.route("/shows", methods=['POST'])
+def new_show():
+    id = request.json.get("id", None)
+    name = request.json.get("name", None)
+    episodes_seen = request.json.get("episodes_seen", None)
+    
+    missing_param = None
+    if id is None:
+        missing_param = "id"
+    elif name is None:
+        missing_param = "name"
+    elif episodes_seen is None:
+        missing_param = "episodes_seen"
+    
+    if (missing_param is not None):
+        return create_response(status=422, message="Missing a required parameter: " + missing_param +
+	                       ". Requires id, name and episodes_seen.")
+    db.create('shows', request.json)
+    return create_response(status=201, message="Show created")
+
+@app.route("/shows/<id>", methods=['PUT'])
+def update_show(id):
+    if db.getById('shows', int(id)) is None:
+        return create_response(status=404, message="No show with this id exists")
+    db.updateById('shows', int(id), request.json)
+    return create_response(status=210, message="Show updated")       
 
 """
 ~~~~~~~~~~~~ END API ~~~~~~~~~~~~
